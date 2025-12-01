@@ -1,179 +1,121 @@
 /**
- * Suno Library Extractor - Browser Console Script
+ * Suno Library Extractor
  *
- * USAGE:
- * 1. Log into Suno.com
- * 2. Go to your Library page
- * 3. Open browser console (F12 or Ctrl+Shift+J)
- * 4. Paste this entire script and press Enter
- * 5. Wait for it to scroll and extract all songs
- * 6. A JSON file will download automatically
+ * Extracts all songs from your Suno.com library with:
+ * - Clean title
+ * - Song URL
+ * - Model version (v4, v4.5+, etc.)
+ *
+ * Usage:
+ * 1. Log into Suno.com and go to your Library page
+ * 2. Open browser console (F12)
+ * 3. Paste this entire script and press Enter
+ * 4. Click through all pagination pages (script will capture as you go)
+ * 5. When done, type: downloadCaptured()
+ * 6. JSON file downloads automatically
  */
 
-(async function extractSunoLibrary() {
-    console.log('🎵 Starting Suno library extraction...');
+(function captureAllPages() {
+    console.log('🎵 Suno Library Extractor - Starting...');
 
-    // Scroll to load all lazy-loaded content
-    console.log('📜 Scrolling to load all songs...');
-    let previousHeight = 0;
-    let scrollAttempts = 0;
-    const maxScrollAttempts = 50;
+    const allSongs = [];
+    const seenIds = new Set();
 
-    while (scrollAttempts < maxScrollAttempts) {
-        window.scrollTo(0, document.body.scrollHeight);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+    // STEP 1: Capture songs already visible on current page
+    console.log('📄 Capturing current page...');
+    const currentRows = document.querySelectorAll('[data-testid="song-row"]');
+    currentRows.forEach(row => {
+        const link = row.querySelector('a[href*="/song/"]');
+        if (!link) return;
 
-        const currentHeight = document.body.scrollHeight;
-        if (currentHeight === previousHeight) {
-            console.log('✓ Reached end of content');
-            break;
-        }
-        previousHeight = currentHeight;
-        scrollAttempts++;
-    }
+        const id = link.href.split('/song/')[1];
+        if (seenIds.has(id)) return;
+        seenIds.add(id);
 
-    // Scroll back to top
-    window.scrollTo(0, 0);
-    await new Promise(resolve => setTimeout(resolve, 500));
+        // Clean up title
+        let title = link.textContent.trim()
+            .replace(/^\d+:\d+/, '')                      // Remove duration
+            .replace(/\s*\(Cover\)\s*/gi, '')             // Remove (Cover)
+            .replace(/\s*v\d+\s*$/i, '')                  // Remove version at end
+            .replace(/\s*(Publish|Edit|Delete|\d+)\s*$/gi, '') // Remove buttons
+            .replace(/\s+/g, ' ')                         // Collapse whitespace
+            .trim();
 
-    console.log('🔍 Extracting song data...');
+        // Extract version
+        const versionMatch = row.textContent.match(/\bv(\d+(\.\d+)?(\+)?)\b/i);
 
-    // Try multiple selectors to find song elements
-    const songs = [];
-
-    // Try to find song cards/items (adjust selectors as needed)
-    const possibleSelectors = [
-        '[data-testid*="song"]',
-        '[data-testid*="track"]',
-        '.song-card',
-        '.track-item',
-        'article',
-        '[class*="SongCard"]',
-        '[class*="TrackItem"]',
-    ];
-
-    let songElements = [];
-    for (const selector of possibleSelectors) {
-        songElements = document.querySelectorAll(selector);
-        if (songElements.length > 0) {
-            console.log(`✓ Found ${songElements.length} elements using selector: ${selector}`);
-            break;
-        }
-    }
-
-    if (songElements.length === 0) {
-        console.error('❌ Could not find song elements. The page structure may have changed.');
-        console.log('💡 Trying alternative extraction method...');
-
-        // Alternative: try to extract from any visible text that looks like songs
-        songElements = document.querySelectorAll('h1, h2, h3, h4, .title, [class*="title"], [class*="Title"]');
-    }
-
-    songElements.forEach((el, index) => {
-        try {
-            const song = {
-                index: index + 1,
-            };
-
-            // Extract title
-            const titleEl = el.querySelector('h1, h2, h3, h4, .title, [class*="title"], [class*="Title"]') || el;
-            if (titleEl) {
-                song.title = titleEl.textContent.trim();
-            }
-
-            // Only add if we found a title
-            if (!song.title || song.title.length === 0) {
-                return;
-            }
-
-            // Extract description/lyrics
-            const descEl = el.querySelector('.description, .lyrics, [class*="description"], [class*="Description"]');
-            if (descEl) {
-                song.description = descEl.textContent.trim();
-            }
-
-            // Extract date
-            const dateEl = el.querySelector('time, .date, [class*="date"], [class*="Date"]');
-            if (dateEl) {
-                song.date = dateEl.textContent.trim() || dateEl.getAttribute('datetime');
-            }
-
-            // Extract duration
-            const durationEl = el.querySelector('.duration, [class*="duration"], [class*="Duration"]');
-            if (durationEl) {
-                song.duration = durationEl.textContent.trim();
-            }
-
-            // Extract tags
-            const tagEls = el.querySelectorAll('.tag, [class*="tag"], [class*="Tag"]');
-            if (tagEls.length > 0) {
-                song.tags = Array.from(tagEls).map(tag => tag.textContent.trim());
-            }
-
-            // Extract audio URL
-            const audioEl = el.querySelector('audio, [src*=".mp3"], [src*=".wav"], [src*="audio"]');
-            if (audioEl) {
-                song.audio_url = audioEl.src || audioEl.getAttribute('src');
-            }
-
-            // Extract image/cover art
-            const imgEl = el.querySelector('img');
-            if (imgEl) {
-                song.image_url = imgEl.src || imgEl.getAttribute('src');
-            }
-
-            // Extract any links
-            const linkEl = el.querySelector('a[href]');
-            if (linkEl) {
-                song.url = linkEl.href;
-            }
-
-            // Get all data attributes (might contain useful info)
-            if (el.dataset) {
-                Object.keys(el.dataset).forEach(key => {
-                    if (!song[key]) {
-                        song[key] = el.dataset[key];
-                    }
-                });
-            }
-
-            songs.push(song);
-        } catch (err) {
-            console.warn(`Warning: Error processing element ${index}:`, err);
-        }
+        allSongs.push({
+            title: title,
+            url: link.href,
+            version: versionMatch ? versionMatch[0] : null
+        });
     });
 
-    console.log(`✓ Extracted ${songs.length} songs`);
+    console.log(`✅ Page 1: ${allSongs.length} songs captured`);
 
-    if (songs.length === 0) {
-        console.error('❌ No songs found! Please check the page structure.');
-        console.log('💡 You may need to adjust the selectors in the script.');
-        return;
-    }
+    // STEP 2: Intercept API calls to capture songs from other pages
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        const clone = response.clone();
 
-    // Show sample
-    console.log('\n📋 Sample (first song):');
-    console.log(JSON.stringify(songs[0], null, 2));
+        const urlArg = args[0];
+        const urlString = typeof urlArg === 'string' ? urlArg : urlArg?.url || '';
 
-    // Download as JSON
-    const dataStr = JSON.stringify(songs, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `suno_library_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+        if (urlString.includes && urlString.includes('feed/v2')) {
+            try {
+                const data = await clone.json();
 
-    console.log(`\n✅ Success! Downloaded ${songs.length} songs to JSON file`);
+                if (data.clips && data.clips.length > 0) {
+                    let newCount = 0;
+                    data.clips.forEach(clip => {
+                        if (!seenIds.has(clip.id)) {
+                            seenIds.add(clip.id);
 
-    // Also copy to clipboard
-    try {
-        await navigator.clipboard.writeText(dataStr);
-        console.log('📋 Also copied to clipboard!');
-    } catch (err) {
-        console.log('💡 Could not copy to clipboard, but file was downloaded');
-    }
+                            const version = clip.metadata?.model_badges?.songrow?.display_name ||
+                                           clip.major_model_version ||
+                                           null;
 
-    return songs;
+                            allSongs.push({
+                                title: clip.title,
+                                url: `https://suno.com/song/${clip.id}`,
+                                version: version
+                            });
+                            newCount++;
+                        }
+                    });
+
+                    console.log(`📄 Page captured: +${newCount} new songs (total: ${allSongs.length})`);
+                }
+            } catch (e) {
+                // Not JSON or parsing error, ignore
+            }
+        }
+
+        return response;
+    };
+
+    console.log('✅ Capture active! Now click through all pages.');
+    console.log('💡 When finished, type: downloadCaptured()');
+
+    // STEP 3: Download function
+    window.downloadCaptured = function() {
+        console.log(`\n📥 Downloading ${allSongs.length} songs...`);
+
+        const json = JSON.stringify(allSongs, null, 2);
+        const blob = new Blob([json], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `suno_library_${allSongs.length}_songs.json`;
+        a.click();
+
+        console.log('✅ Downloaded!');
+        console.log('\nSample (first 2 songs):');
+        console.log(JSON.stringify(allSongs.slice(0, 2), null, 2));
+
+        // Cleanup
+        window.fetch = originalFetch;
+        console.log('\n🧹 Cleaned up - script is now inactive');
+    };
 })();

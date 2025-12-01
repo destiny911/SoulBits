@@ -1,50 +1,78 @@
 # SoulBits
 
-Extract a list of all songs from your Suno.com library.
+Extract a complete list of all songs from your Suno.com library with clean titles, URLs, and version info.
 
-## Easiest Way: Browser Console (Recommended)
+## How to Use
 
-**No installation needed!** Just run this while logged into Suno:
+**Step 1: Open Your Library**
+- Log into [Suno.com](https://suno.com)
+- Navigate to your Library page
 
-1. Log into Suno.com and go to your Library page
-2. Press **F12** (or **Ctrl+Shift+J** / **Cmd+Option+J** on Mac)
-3. Paste the contents of `extract_library.js` into the console
-4. Press **Enter**
-5. Wait for it to scroll and extract all songs
-6. A JSON file will download automatically 🎉
+**Step 2: Open Browser Console**
+- Press **F12** (or **Ctrl+Shift+J** / **Cmd+Option+J** on Mac)
+- Click the **"Console"** tab
 
-See `BOOKMARKLET.md` for an even easier one-click bookmarklet method.
+**Step 3: Run the Script**
+- Copy the entire contents of `extract_library.js`
+- Paste into the console
+- Press **Enter**
 
----
+**Step 4: Click Through Pages**
+- The script will capture page 1 automatically
+- Manually click through pages 2, 3, 4... to the last page
+- The console will show progress as you go:
+  ```
+  ✅ Page 1: 40 songs captured
+  📄 Page captured: +40 new songs (total: 80)
+  📄 Page captured: +40 new songs (total: 120)
+  ...
+  ```
 
-## What You Get
+**Step 5: Download**
+- When you've clicked through all pages, type in the console:
+  ```javascript
+  downloadCaptured()
+  ```
+- Press **Enter**
+- A JSON file will download with all your songs!
 
-A JSON file with all your songs:
+## Output Format
+
+You'll get a clean JSON file with:
+
 ```json
 [
   {
-    "index": 1,
-    "title": "My Song Title",
-    "description": "Song description",
-    "date": "2024-01-01",
-    "duration": "3:45",
-    "audio_url": "https://...",
-    "image_url": "https://...",
+    "title": "Song Title",
     "url": "https://suno.com/song/...",
-    "tags": ["tag1", "tag2"]
+    "version": "v4.5+"
+  },
+  {
+    "title": "Another Song",
+    "url": "https://suno.com/song/...",
+    "version": "v4"
   }
 ]
 ```
 
----
+## Notes
 
-## Alternative: Automated Method (Advanced)
+- Works with any number of songs (tested with 450+)
+- Version indicates which Suno model was used (v4, v4.5+, etc.)
+- Titles are automatically cleaned (removes duration, buttons, etc.)
+- No installation required - runs entirely in your browser
+- Safe - only reads data you already have access to
 
-If you need to run this automatically without manual login:
+## Troubleshooting
 
-See `suno_library.py` for a Python/Playwright solution that:
-- Logs in automatically
-- Handles lazy loading
-- Saves to JSON
+**Pages not changing?**
+- Make sure you paste the script **before** clicking pagination
+- Reload the page and start over if needed
 
-Requires: `pip install -r requirements.txt && playwright install chromium`
+**Missing songs?**
+- Make sure you clicked through **all** pages
+- Check the console for the total count before downloading
+
+**Script not working?**
+- Make sure you're on the Library page (not Songs/Playlists/etc.)
+- Try in a different browser (Chrome/Firefox/Edge)
